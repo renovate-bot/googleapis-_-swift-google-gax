@@ -105,14 +105,11 @@ import struct NIOCore.ByteBuffer
     } catch let e {
       return .failure(.io(e))
     }
-    // The `pointer` value is only valid for the duration of the closure.
-    // SAFETY: The pointer does not escape the call to the closure, because decoding copies all the
-    // data into new buffers.
-    let payload = try buffer.withUnsafeReadableBytes({ (pointer: UnsafeRawBufferPointer) throws in
-      let data = Data(pointer)
-      let decoder = _ProtoJSONDecoder()
-      return try decoder.decode(type, from: data)
-    })
+    // Use `.noCopy` (matching `NIOFoundationCompat`'s `JSONDecoder.decode(_:from: ByteBuffer)`)
+    // so `Data` references `buffer`'s underlying storage without copying.
+    let data = Data(buffer: buffer, byteTransferStrategy: .noCopy)
+    let decoder = _ProtoJSONDecoder()
+    let payload = try decoder.decode(type, from: data)
     return .success(payload)
   }
 }

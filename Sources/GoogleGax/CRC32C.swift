@@ -38,22 +38,34 @@ public import Foundation
   }
 
   public mutating func update(_ data: Data) {
-    data.withUnsafeBytes { buffer in
+    // `Foundation.Data.withUnsafeBytes` is not yet marked `@safe` in `FoundationEssentials`,
+    // so SE-0458 infers `@unsafe` from its `UnsafeRawBufferPointer` closure parameter.
+    unsafe data.withUnsafeBytes { buffer in
       update(buffer)
     }
   }
 
+  // Marked `@safe` to override SE-0458's implicit `@unsafe` inference on `UnsafeRawBufferPointer`
+  // parameters. All memory accesses are bounded by `buffer.count`, stopping viral `unsafe` propagation.
+  @safe
   public mutating func update(_ buffer: UnsafeRawBufferPointer) {
-    guard let baseAddress = buffer.baseAddress, !buffer.isEmpty else { return }
+    // `UnsafeRawBufferPointer.isEmpty` requires `unsafe` because its `Collection` conformance is `@unsafe`.
+    guard let baseAddress = buffer.baseAddress, unsafe !buffer.isEmpty else { return }
     if Self.isHardwareAccelerated {
-      value = googleGax_crc32c_hw(value, baseAddress, buffer.count)
+      // SAFETY: `baseAddress` is non-nil and `buffer.count` bounds the read to the buffer's extent.
+      value = unsafe googleGax_crc32c_hw(value, baseAddress, buffer.count)
     } else {
       updateSoftware(buffer)
     }
   }
 
+  // Marked `@safe` to override SE-0458's implicit `@unsafe` inference on `UnsafeRawBufferPointer`.
+  @safe
   mutating func updateSoftware(_ buffer: UnsafeRawBufferPointer) {
-    for byte in buffer {
+    // `UnsafeRawBufferPointer`'s `Sequence` conformance is `@unsafe` under SE-0458.
+    // `swift-format` 6.3 misformats `for unsafe byte` as `for unsafebyte`.
+    // swift-format-ignore
+    for unsafe byte in unsafe buffer {
       let index = Int(UInt8(value & 0xFF) ^ byte)
       value = (value >> 8) ^ Self.table[index]
     }
@@ -74,6 +86,8 @@ public import Foundation
     return crc.finalize()
   }
 
+  // Marked `@safe` to override SE-0458's implicit `@unsafe` inference on `UnsafeRawBufferPointer`.
+  @safe
   public static func compute(_ buffer: UnsafeRawBufferPointer) -> UInt32 {
     var crc = Self()
     crc.update(buffer)
@@ -81,11 +95,13 @@ public import Foundation
   }
 
   static func computeSoftware(_ data: Data) -> UInt32 {
-    data.withUnsafeBytes { buffer in
+    unsafe data.withUnsafeBytes { buffer in
       computeSoftware(buffer)
     }
   }
 
+  // Marked `@safe` to override SE-0458's implicit `@unsafe` inference on `UnsafeRawBufferPointer`.
+  @safe
   static func computeSoftware(_ buffer: UnsafeRawBufferPointer) -> UInt32 {
     var crc = Self()
     crc.updateSoftware(buffer)
