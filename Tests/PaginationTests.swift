@@ -56,16 +56,6 @@ import Testing
       let response = mockResponses.removeFirst()
       return response
     }
-    public func listItemsByItems(request: ListItemsRequest) -> any AsyncSequence<Item, Swift.Error>
-      & Sendable
-    {
-      let listRpc = { @Sendable (token: String) async throws -> ListItemsResponse in
-        var request = request
-        request.pageToken = token
-        return try await self.listItems(request: request)
-      }
-      return PaginatedResponseSequence(listRpc: listRpc)
-    }
   }
 
   @Test func onePage() async throws {
@@ -183,11 +173,6 @@ import Testing
     #expect(array.isEmpty)
   }
 
-  protocol PaginatedServiceProtocol: Sendable {
-    func listItemsByItems(request: ListItemsRequest) -> any AsyncSequence<Item, Swift.Error>
-      & Sendable
-  }
-
   actor ItemCollector {
     private(set) var items: [Item] = []
     func record(_ item: Item) {
@@ -260,5 +245,54 @@ import Testing
     #expect(results.count == 2)
     #expect(results[0] == [Item(name: "a"), Item(name: "b"), Item(name: "c")])
     #expect(results[1] == [Item(name: "a"), Item(name: "b"), Item(name: "c")])
+  }
+
+  @Test func asyncSequenceCombinators() async throws {
+    let service = PaginatedService(
+      mockResponses: [
+        ListItemsResponse(
+          items: [Item(name: "item1"), Item(name: "item2")], nextPageToken: "token1"),
+        ListItemsResponse(items: [Item(name: "item3"), Item(name: "item4")], nextPageToken: ""),
+      ])
+
+    var prefixed: [Item] = []
+    for try await item in service.listItemsByItems(request: .init()).prefix(3) {
+      prefixed.append(item)
+    }
+    #expect(prefixed == [Item(name: "item1"), Item(name: "item2"), Item(name: "item3")])
+
+    let service2 = PaginatedService(
+      mockResponses: [
+        ListItemsResponse(
+          items: [Item(name: "a"), Item(name: "b"), Item(name: "c")], nextPageToken: "")
+      ])
+    var filteredAndMapped: [String] = []
+    for try await name in service2.listItemsByItems(request: .init()).filter({ $0.name != "b" })
+      .map({
+        $0.name.uppercased()
+      })
+    {
+      filteredAndMapped.append(name)
+    }
+    #expect(filteredAndMapped == ["A", "C"])
+  }
+}
+
+protocol PaginatedServiceProtocol: Sendable {
+  func listItems(request: PaginatedResponseTest.ListItemsRequest) async throws
+    -> PaginatedResponseTest.ListItemsResponse
+}
+
+extension PaginatedServiceProtocol {
+  func listItemsByItems(request: PaginatedResponseTest.ListItemsRequest)
+    -> some AsyncSequence<PaginatedResponseTest.Item, Swift.Error> & Sendable
+  {
+    let listRpc = {
+      @Sendable (token: String) async throws -> PaginatedResponseTest.ListItemsResponse in
+      var request = request
+      request.pageToken = token
+      return try await self.listItems(request: request)
+    }
+    return GoogleGax.PaginatedResponseSequence(listRpc: listRpc)
   }
 }
