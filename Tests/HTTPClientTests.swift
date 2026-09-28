@@ -108,6 +108,101 @@ import NIOHTTP1
     #expect(buf == buffer)
   }
 
+  @Test func requestOptionsHeaders() async throws {
+    let endpoint = "http://localhost:1234"
+    let credentials = try Credentials(configuration: .anonymous)
+    let options = ClientOptions().with { $0.credentials = credentials }
+    let client = try _HTTPClient(from: options, withDefaultEndpoint: endpoint)
+    let reqOptions = RequestOptions().with {
+      $0.headers["x-goog-gcs-idempotency-token"] = "test-token"
+      $0.headers["custom-header"] = "custom-val"
+    }
+    let request = try await client.newRequest(path: "/test", query: [], options: reqOptions)
+    #expect(request.headers["x-goog-gcs-idempotency-token"] == ["test-token"])
+    #expect(request.headers["custom-header"] == ["custom-val"])
+
+    let percentEncodedRequest = try await client.newRequest(
+      percentEncodedPath: "/test", query: [], options: reqOptions
+    )
+    #expect(percentEncodedRequest.headers["x-goog-gcs-idempotency-token"] == ["test-token"])
+    #expect(percentEncodedRequest.headers["custom-header"] == ["custom-val"])
+
+    guard let components = URLComponents(string: "http://localhost:1234/test") else {
+      Issue.record("failed to create components")
+      return
+    }
+    let componentsRequest = try await client.newRequest(
+      urlComponents: components, options: reqOptions
+    )
+    #expect(componentsRequest.headers["x-goog-gcs-idempotency-token"] == ["test-token"])
+    #expect(componentsRequest.headers["custom-header"] == ["custom-val"])
+  }
+
+  @Test func requestOptionsHeadersReservedHeadersIgnored() async throws {
+    let endpoint = "http://localhost:1234"
+    let credentials = try Credentials(configuration: .anonymous)
+    let options = ClientOptions().with { $0.credentials = credentials }
+    let client = try _HTTPClient(from: options, withDefaultEndpoint: endpoint)
+    let reqOptions = RequestOptions().with {
+      $0.headers["authorization"] = "Bearer bad-token"
+      $0.headers["Authorization"] = "Bearer bad-token-upper"
+      $0.headers["x-goog-api-key"] = "bad-key"
+      $0.headers["x-goog-user-project"] = "bad-project"
+      $0.headers["x-goog-api-client"] = "bad-client"
+      $0.headers["x-goog-request-params"] = "bad-params"
+      $0.headers["Host"] = "evil.com"
+      $0.headers["host"] = "evil-lower.com"
+      $0.headers["user-agent"] = "bad-agent"
+      $0.headers["x-goog-gcs-idempotency-token"] = "valid-token"
+    }
+    let request = try await client.newRequest(path: "/test", query: [], options: reqOptions)
+    #expect(request.headers["authorization"].isEmpty)
+    #expect(request.headers["x-goog-api-key"].isEmpty)
+    #expect(request.headers["x-goog-user-project"].isEmpty)
+    #expect(request.headers["x-goog-api-client"].isEmpty)
+    #expect(request.headers["x-goog-request-params"].isEmpty)
+    #expect(request.headers["user-agent"].isEmpty)
+    #expect(request.headers["Host"] == ["localhost"])
+    #expect(request.headers["x-goog-gcs-idempotency-token"] == ["valid-token"])
+  }
+
+  @Test func requestOptionsHeadersAuthPrecedence() async throws {
+    struct MockAuthCredentials: _CredentialsProtocol {
+      let authHeaders: AuthHeaders
+      func headers() async throws -> AuthHeaders {
+        self.authHeaders
+      }
+    }
+    struct DummyHTTPClient: _HTTPClientProtocol {
+      func execute(request: HTTPClientRequest, timeout: Duration) async throws
+        -> HTTPClientResponse
+      {
+        fatalError("Not called during newRequest")
+      }
+    }
+    let endpoint = "http://localhost:1234"
+    let mockCreds = MockAuthCredentials(
+      authHeaders: [
+        ("authorization", "Bearer valid-auth-token"),
+        ("x-custom-future-auth", "future-valid-token"),
+      ]
+    )
+    let client = try _HTTPClient(
+      DummyHTTPClient(),
+      endpoint: endpoint,
+      credentials: mockCreds
+    )
+    let reqOptions = RequestOptions().with {
+      $0.headers["authorization"] = "Bearer bad-token"
+      $0.headers["x-custom-future-auth"] = "bad-future-token"
+      $0.headers["x-legitimate-custom"] = "legit-val"
+    }
+    let request = try await client.newRequest(path: "/test", query: [], options: reqOptions)
+    #expect(request.headers["authorization"] == ["Bearer valid-auth-token"])
+    #expect(request.headers["x-custom-future-auth"] == ["future-valid-token"])
+    #expect(request.headers["x-legitimate-custom"] == ["legit-val"])
+  }
+
   @Test(arguments: [
     "bad-bad-bad",
     "htt://localhost:1",
