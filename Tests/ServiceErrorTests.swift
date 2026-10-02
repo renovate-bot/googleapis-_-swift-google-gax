@@ -87,6 +87,18 @@ import Testing
     #expect(withDetails.description.hasPrefix("RESOURCE_EXHAUSTED (HTTP 429): Quota exceeded ["))
   }
 
+  @Test func debugDescription() {
+    let error = ServiceError(
+      code: .notFound,
+      message: "Resource missing",
+      httpStatusCode: 404
+    )
+    #expect(
+      error.debugDescription
+        == "ServiceError(code: notFound, httpStatusCode: 404, message: \"Resource missing\")"
+    )
+  }
+
   @Test func googleRpcCodeFromHttpStatusCode() {
     let mappings: [(Int, GoogleRpc.Code)] = [
       (200, .ok),

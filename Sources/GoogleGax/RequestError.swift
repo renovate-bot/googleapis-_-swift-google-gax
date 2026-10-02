@@ -136,6 +136,72 @@ public struct HTTPDetails: Sendable {
   }
 }
 
+extension HTTPDetails: Equatable {}
+
+extension HTTPDetails: CustomStringConvertible {
+  public var description: String {
+    "HTTP status \(statusCode)"
+  }
+}
+
+extension HTTPDetails: CustomDebugStringConvertible {
+  public var debugDescription: String {
+    var desc = "HTTPDetails(statusCode: \(statusCode), headers: \(headers)"
+    if !payload.isEmpty {
+      let snippet = String(decoding: payload.prefix(1024), as: UTF8.self)
+      desc += ", payload: \(String(reflecting: snippet))"
+    }
+    desc += ")"
+    return desc
+  }
+}
+
+extension RequestError: CustomStringConvertible {
+  public var description: String {
+    switch self {
+    case .binding(let error):
+      return "URL binding error: \(error.description)"
+    case .io(let error):
+      return "I/O error: \(error)"
+    case .http(let details):
+      return "HTTP error \(details.statusCode)"
+    case .service(let error):
+      return error.description
+    case .exhausted(let error):
+      return error.description
+    case .unimplemented:
+      return "Method unimplemented"
+    case .malformedResponse(let message):
+      return "Malformed response: \(message)"
+    case .badURL(let url):
+      return "Invalid endpoint URL: \(url)"
+    }
+  }
+}
+
+extension RequestError: CustomDebugStringConvertible {
+  public var debugDescription: String {
+    switch self {
+    case .binding(let error):
+      return "RequestError.binding(\(String(reflecting: error)))"
+    case .io(let error):
+      return "RequestError.io(\(String(reflecting: error)))"
+    case .http(let details):
+      return "RequestError.http(\(String(reflecting: details)))"
+    case .service(let error):
+      return "RequestError.service(\(String(reflecting: error)))"
+    case .exhausted(let error):
+      return "RequestError.exhausted(\(String(reflecting: error)))"
+    case .unimplemented:
+      return "RequestError.unimplemented"
+    case .malformedResponse(let message):
+      return "RequestError.malformedResponse(\"\(message)\")"
+    case .badURL(let url):
+      return "RequestError.badURL(\"\(url)\")"
+    }
+  }
+}
+
 /// The details for ``RequestError/exhausted(_:)``.
 public enum PolicyExhaustedError: Error, Sendable, CustomStringConvertible {
   /// The retry or polling policy exceeded its maximum elapsed time.
@@ -164,6 +230,21 @@ public enum PolicyExhaustedError: Error, Sendable, CustomStringConvertible {
       return "policy exhausted: elapsed time limit of \(maxDuration) exceeded"
     case .attemptCount(let maxAttempts):
       return "policy exhausted: attempt count limit of \(maxAttempts) exceeded"
+    }
+  }
+}
+
+extension PolicyExhaustedError: CustomDebugStringConvertible {
+  public var debugDescription: String {
+    switch self {
+    case .elapsedTime(let maxDuration, let source):
+      if let source {
+        return
+          "PolicyExhaustedError.elapsedTime(maximumDuration: \(maxDuration), source: \(String(reflecting: source)))"
+      }
+      return "PolicyExhaustedError.elapsedTime(maximumDuration: \(maxDuration))"
+    case .attemptCount(let maxAttempts):
+      return "PolicyExhaustedError.attemptCount(maximumAttempts: \(maxAttempts))"
     }
   }
 }

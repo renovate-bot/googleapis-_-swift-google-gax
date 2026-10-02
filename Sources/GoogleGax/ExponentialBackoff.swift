@@ -28,6 +28,34 @@ public enum ExponentialBackoffError: Error, Sendable {
   case emptyRange(initial: Duration, maximum: Duration)
 }
 
+extension ExponentialBackoffError: Equatable {}
+
+extension ExponentialBackoffError: CustomStringConvertible {
+  public var description: String {
+    switch self {
+    case .invalidScalingFactor(let scaling):
+      return "Invalid scaling factor: \(scaling) (must be >= 1.0)"
+    case .invalidInitialDelay(let delay):
+      return "Invalid initial delay: \(delay) (must be > 0)"
+    case .emptyRange(let initial, let maximum):
+      return "Invalid delay range: initial delay \(initial) must be <= maximum delay \(maximum)"
+    }
+  }
+}
+
+extension ExponentialBackoffError: CustomDebugStringConvertible {
+  public var debugDescription: String {
+    switch self {
+    case .invalidScalingFactor(let scaling):
+      return "ExponentialBackoffError.invalidScalingFactor(\(scaling))"
+    case .invalidInitialDelay(let delay):
+      return "ExponentialBackoffError.invalidInitialDelay(\(delay))"
+    case .emptyRange(let initial, let maximum):
+      return "ExponentialBackoffError.emptyRange(initial: \(initial), maximum: \(maximum))"
+    }
+  }
+}
+
 /// Configuration for ``ExponentialBackoff``.
 public struct ExponentialBackoffConfig: Sendable, Equatable {
   /// The initial delay before the first retry.

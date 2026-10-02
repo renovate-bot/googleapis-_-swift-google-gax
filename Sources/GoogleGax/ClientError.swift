@@ -30,3 +30,23 @@ public enum ClientError: Error, Sendable {
   /// Review the configuration for your client.
   case invalidEndpoint(String)
 }
+
+extension ClientError: Equatable {}
+
+extension ClientError: CustomStringConvertible {
+  public var description: String {
+    switch self {
+    case .invalidEndpoint(let endpoint):
+      return "Invalid endpoint: \(endpoint)"
+    }
+  }
+}
+
+extension ClientError: CustomDebugStringConvertible {
+  public var debugDescription: String {
+    switch self {
+    case .invalidEndpoint(let endpoint):
+      return "ClientError.invalidEndpoint(\(String(reflecting: endpoint)))"
+    }
+  }
+}

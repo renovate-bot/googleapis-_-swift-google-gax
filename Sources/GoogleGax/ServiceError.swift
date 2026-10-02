@@ -53,6 +53,21 @@ public struct ServiceError: Sendable, Error, Equatable, CustomStringConvertible 
   }
 }
 
+extension ServiceError: CustomDebugStringConvertible {
+  public var debugDescription: String {
+    var desc = "ServiceError(code: \(code)"
+    if let httpStatusCode {
+      desc += ", httpStatusCode: \(httpStatusCode)"
+    }
+    desc += ", message: \(String(reflecting: message))"
+    if !details.isEmpty {
+      desc += ", details: \(String(reflecting: details))"
+    }
+    desc += ")"
+    return desc
+  }
+}
+
 @_spi(GoogleCloudInternal)
 extension GoogleRpc.Code {
   /// Maps an HTTP status code to the corresponding canonical `GoogleRpc.Code`.
