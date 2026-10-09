@@ -115,24 +115,32 @@ import NIOHTTP1
     let options = ClientOptions().with { $0.credentials = credentials }
     let client = try _HTTPClient(from: options, withDefaultEndpoint: endpoint)
     let reqOptions = RequestOptions().with {
+      $0.headers = [
+        ("x-multi-header", "first"),
+        ("x-multi-header", "second"),
+      ]
       $0.headers["x-goog-gcs-idempotency-token"] = "test-token"
+      $0.headers["Custom-Header"] = "overridden-val"
       $0.headers["custom-header"] = "custom-val"
     }
     let request = try await client.newRequest(path: "/test", query: [], options: reqOptions)
     #expect(request.headers["x-goog-gcs-idempotency-token"] == ["test-token"])
     #expect(request.headers["custom-header"] == ["custom-val"])
+    #expect(request.headers["x-multi-header"] == ["first", "second"])
 
     let percentEncodedRequest = try await client.newRequest(
       percentEncodedPath: "/test", query: [], options: reqOptions
     )
     #expect(percentEncodedRequest.headers["x-goog-gcs-idempotency-token"] == ["test-token"])
     #expect(percentEncodedRequest.headers["custom-header"] == ["custom-val"])
+    #expect(percentEncodedRequest.headers["x-multi-header"] == ["first", "second"])
 
     let componentsRequest = try await client.newRequest(
       uri: "http://localhost:1234/test", options: reqOptions
     )
     #expect(componentsRequest.headers["x-goog-gcs-idempotency-token"] == ["test-token"])
     #expect(componentsRequest.headers["custom-header"] == ["custom-val"])
+    #expect(componentsRequest.headers["x-multi-header"] == ["first", "second"])
   }
 
   @Test func requestOptionsHeadersReservedHeadersIgnored() async throws {
@@ -141,16 +149,18 @@ import NIOHTTP1
     let options = ClientOptions().with { $0.credentials = credentials }
     let client = try _HTTPClient(from: options, withDefaultEndpoint: endpoint)
     let reqOptions = RequestOptions().with {
-      $0.headers["authorization"] = "Bearer bad-token"
-      $0.headers["Authorization"] = "Bearer bad-token-upper"
-      $0.headers["x-goog-api-key"] = "bad-key"
-      $0.headers["x-goog-user-project"] = "bad-project"
-      $0.headers["x-goog-api-client"] = "bad-client"
-      $0.headers["x-goog-request-params"] = "bad-params"
-      $0.headers["Host"] = "evil.com"
-      $0.headers["host"] = "evil-lower.com"
-      $0.headers["user-agent"] = "bad-agent"
-      $0.headers["x-goog-gcs-idempotency-token"] = "valid-token"
+      $0.headers = [
+        "authorization": "Bearer bad-token",
+        "Authorization": "Bearer bad-token-upper",
+        "x-goog-api-key": "bad-key",
+        "x-goog-user-project": "bad-project",
+        "x-goog-api-client": "bad-client",
+        "x-goog-request-params": "bad-params",
+        "Host": "evil.com",
+        "host": "evil-lower.com",
+        "user-agent": "bad-agent",
+        "x-goog-gcs-idempotency-token": "valid-token",
+      ]
     }
     let request = try await client.newRequest(path: "/test", query: [], options: reqOptions)
     #expect(request.headers["authorization"].isEmpty)
