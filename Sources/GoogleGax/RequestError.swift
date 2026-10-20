@@ -195,9 +195,9 @@ extension RequestError: CustomDebugStringConvertible {
     case .unimplemented:
       return "RequestError.unimplemented"
     case .malformedResponse(let message):
-      return "RequestError.malformedResponse(\"\(message)\")"
+      return "RequestError.malformedResponse(\(String(reflecting: message)))"
     case .badURL(let url):
-      return "RequestError.badURL(\"\(url)\")"
+      return "RequestError.badURL(\(String(reflecting: url)))"
     }
   }
 }
